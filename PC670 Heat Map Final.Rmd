@@ -1,0 +1,249 @@
+---
+title: "PC670 Heat Map"
+author: "Alex Prevatte"
+date: "4/7/2020"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r}
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Libraries
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+library(ComplexHeatmap)
+library(circlize)
+library(colorspace)
+library(GetoptLong)
+library(readr)
+library(writexl)
+library(circlize)
+library(dplyr)
+library(matrixStats)
+library(RColorBrewer)
+
+#read in text file with updated log2 FC and qvalue thresholds
+PC670 <- read_tsv("/Users/awprevatte/PC670_DataAnalysis_forAlex.txt")
+#convert to dataframe to select specific columns
+data670 <- data.frame(PC670)
+#select columns needed
+heat670 <- data.frame(data670$X131.0h_R1, data670$X126.0h_R2, data670$X129N.0h_R3, data670$X128C.48h_R1, data670$X130N.48h_R2, data670$X129C.48h_R3, data670$X127C.96h_R1, data670$X128N.96h_R2, data670$X127N.96h_R3)
+
+#compute z-score by row 
+heat670_z <- (heat670-rowMeans(heat670))/(rowSds(as.matrix(heat670)))[row(heat670)]
+
+#rename columns 
+names(heat670_z)[names(heat670_z) == "data670.X131.0h_R1"] <- "R1_0h"
+names(heat670_z)[names(heat670_z) == "data670.X126.0h_R2"] <- "R2_0h"
+names(heat670_z)[names(heat670_z) == "data670.X129N.0h_R3"] <- "R3_0h"
+names(heat670_z)[names(heat670_z) == "data670.X128C.48h_R1"] <- "R1_48h"
+names(heat670_z)[names(heat670_z) == "data670.X130N.48h_R2"] <- "R2_48h"
+names(heat670_z)[names(heat670_z) == "data670.X129C.48h_R3"] <- "R3_48h"
+names(heat670_z)[names(heat670_z) == "data670.X127C.96h_R1"] <- "R1_96h"
+names(heat670_z)[names(heat670_z) == "data670.X128N.96h_R2"] <- "R2_96h"
+names(heat670_z)[names(heat670_z) == "data670.X127N.96h_R3"] <- "R3_96h"
+
+#convert to matrix as needed for heatmap function
+heat670_z <- as.matrix(heat670_z)
+
+#add gene names as rows
+rownames(heat670_z) <- c(data670$Gene.names)
+
+#used for splitting the heatmap into 3 sections
+split <- read_tsv("/Users/awprevatte/Design_Heat.txt")
+split <- as.data.frame(split)
+#check factors
+factor(split$Replicate)
+
+#width of columns
+width_protein <- ncol(heat670_z)*0.4
+
+Heatmap(heat670_z, 
+        name = "z-score \nlog2 intensity",
+        cluster_columns = F, 
+        cluster_rows = T,
+        #heatmap split by levels
+        column_split = factor(rep(c(split$Replicate))),
+        column_title = "PC670 protein \n selection criteria: log2.fc >=0.5, q-val <= 0.05",
+        column_title_gp = gpar(fontface = "bold", fontsize=10),
+        column_names_gp = gpar(fontsize = 8),
+        show_row_names=F,
+        width =  width_protein,
+        #colors
+        col = colorRamp2(seq(min(heat670_z), max(heat670_z), length = 256),
+                         rev(colorRampPalette(brewer.pal(10, "RdBu"))(256))),
+        na_col = "#BBBBBB",
+        #annotation
+        top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 2:4),
+                labels = c("0h", "48h", "96h"), 
+        labels_gp = gpar(col = "white", fontsize = 10)))
+)
+
+
+######## Other way of creating heatmap by constructing individually and setting them side by side, but takes longer and isn't as effective
+
+
+
+#splice into three heatmaps
+#heat670_z1 <- data.frame(heat670_z$R1_0, heat670_z$R2_0, heat670_z$R3_0)
+#heat670_z2 <- data.frame(heat670_z$R1_48, heat670_z$R2_48, heat670_z$R3_48)
+#heat670_z3 <- data.frame(heat670_z$R1_96, heat670_z$R2_96, heat670_z$R3_96)
+
+#change row names of three individual heatmap columns (for heatmap 2 splicing)
+# names(heat670_z1)[names(heat670_z1) == "heat670_z.R1_0"] <- "R1_0"
+# names(heat670_z1)[names(heat670_z1) == "heat670_z.R2_0"] <- "R2_0"
+# names(heat670_z1)[names(heat670_z1) == "heat670_z.R3_0"] <- "R3_0"
+# names(heat670_z2)[names(heat670_z2) == "heat670_z.R1_48"] <- "R1_48"
+# names(heat670_z2)[names(heat670_z2) == "heat670_z.R2_48"] <- "R2_48"
+# names(heat670_z2)[names(heat670_z2) == "heat670_z.R3_48"] <- "R3_48"
+# names(heat670_z3)[names(heat670_z3) == "heat670_z.R1_96"] <- "R1_96"
+# names(heat670_z3)[names(heat670_z3) == "heat670_z.R2_96"] <- "R2_96"
+# names(heat670_z3)[names(heat670_z3) == "heat670_z.R3_96"] <- "R3_96"
+
+#heat670_z1 <- as.matrix(heat670_z1)
+#heat670_z2 <- as.matrix(heat670_z2)
+#heat670_z3 <- as.matrix(heat670_z3)
+
+#transform to add levels. will help with heatmap splicing
+# heat670_z1t <- t(heat670_z1)
+# heat670_z1t <- as.data.frame(heat670_z1t)
+# heat670_z1t$ID <- rep("0", nrow(heat670_z1t))
+
+# heat670_z2t <- t(heat670_z2)
+# heat670_z2t <- as.data.frame(heat670_z2t)
+# heat670_z2t$ID <- rep("1", nrow(heat670_z2t))
+
+# heat670_z3t <- t(heat670_z3)
+# heat670_z3t <- as.data.frame(heat670_z3t)
+# heat670_z3t$ID <- rep("2", nrow(heat670_z3t))
+
+# heat670_zt <- rbind(heat670_z1t, heat670_z2t, heat670_z3t)
+
+
+# ht1 <- Heatmap(heat670_z1, 
+#         name = "Continuous",
+#         cluster_columns = F, 
+#         cluster_rows = T,
+#         #cluster_column_slices = F,
+#         #column_order = 9:1,
+#         #column_km = 3,
+#         #column_title = "PC670 protein selection criteria: log2.fc >=0.5, q-val <= 0.05",
+#         column_title_gp = gpar(fontface = "bold", fontsize=10),
+#         column_names_gp = gpar(fontsize = 8),
+#         show_row_names=F,
+#         heatmap_legend_param = list(legend_height = unit(6, "cm")),
+#         width =  width.protein.quant,
+#         #top_annotation = heatmap.quant.col.annot,
+#         #colors
+#         col = colorRamp2(seq(min(heat670_z1), max(heat670_z1), length = 256),
+#                          rev(colorRampPalette(brewer.pal(10, "RdBu"))(256))),
+#         na_col = "#BBBBBB",
+#         #top_annotation = ha1
+#         #lgd = Legend(col_fun = col_fun, title = "foo", legend_height = unit(6, "cm"))
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 1:3)))
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 2:4))), column_km = 3
+# )
+# 
+# ht2 <- Heatmap(heat670_z2, 
+#         name = "48h",
+#         cluster_columns = F, 
+#         cluster_rows = T,
+#         #cluster_column_slices = F,
+#         #column_order = 9:1,
+#         #column_km = 3,
+#         #column_title = "PC670 protein selection criteria: log2.fc >=0.5, q-val <= 0.05",
+#         column_title_gp = gpar(fontface = "bold", fontsize=10),
+#         column_names_gp = gpar(fontsize = 8),
+#         show_row_names=F,
+#         width =  width.protein.quant,
+#         #top_annotation = heatmap.quant.col.annot,
+#         #colors
+#         col = colorRamp2(seq(min(heat670_z2), max(heat670_z2), length = 256),
+#                          rev(colorRampPalette(brewer.pal(10, "RdBu"))(256))),
+#         show_heatmap_legend = FALSE,
+#         na_col = "#BBBBBB",
+#         #top_annotation = ha2
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 1:3)))
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 2:4))), column_km = 3
+# )
+# 
+# ht3 <- Heatmap(heat670_z3, 
+#         name = "96h",
+#         cluster_columns = F, 
+#         cluster_rows = T,
+#         #cluster_column_slices = F,
+#         #column_order = 9:1,
+#         #column_km = 3,
+#         #column_title = "PC670 protein selection criteria: log2.fc >=0.5, q-val <= 0.05",
+#         column_title_gp = gpar(fontface = "bold", fontsize=10),
+#         column_names_gp = gpar(fontsize = 8),
+#         show_row_names=F,
+#         width =  width.protein.quant,
+#         #top_annotation = heatmap.quant.col.annot,
+#         #colors
+#         col = colorRamp2(seq(min(heat670_z3), max(heat670_z3), length = 256),
+#                          rev(colorRampPalette(brewer.pal(10, "RdBu"))(256))),
+#         show_heatmap_legend = FALSE,
+#         na_col = "#BBBBBB",
+#         #top_annotation = ha3
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 1:3)))
+#         #top_annotation = HeatmapAnnotation(foo = anno_block(gp = gpar(fill = 2:4))), column_km = 3
+# )
+# 
+# ht_list <-ht1 + ht2 + ht3
+# draw(ht_list, column_title = "PC670 protein selection criteria: log2 FC >= 0.5 q-val <= 0.05", column_title_gp = gpar(fontface = "bold",fontsize = 16))
+
+#ht_list = columnAnnotation(block = anno_block(gp = gpar(fill = 2:4)), 
+    #width = unit(2, "mm")) + ht_list
+
+##########      If importing back into perseus follow these instructions:     ########## 
+
+
+
+
+#convert dataframe to excel sheet
+#write_xlsx(input, path = "results.xlsx")
+#added gene row in excel and imported text file into perseus
+#import z-score data from perseus
+#PC670_z <- read_tsv("/Users/awprevatte/PC670_qval0.05_log2fc0.5_zscore.txt")
+
+
+
+
+
+#########     Replicate of Dennis's heatmap annotation with some of my transformation... but there's an error. Skip over this until I have more time to take a closer look.           #########
+
+
+
+
+
+# #create annotation for heatmap by assigning levels
+# annotation_col <- select(design,Condition) 
+# annotation_col <- as.matrix(annotation_col)
+# annotation_col_f <- factor(annotation_col)
+# n.con <- nlevels(annotation_col_f)
+# n.con.l <- levels(annotation_col_f)
+# annotation_col <- list(annotation_col)
+
+# #assign colors
+# condition.colors <- structure(brewer.pal(n.con, "Set1")[1:n.con], names=levels(annotation_col$Condition))
+# annotation_col <- as.data.frame(annotation_col)
+
+
+# #assign colors
+# condition.colors <- structure(brewer.pal(n.con, "Set1")[1:n.con], names=levels(annotation_col$Condition))
+# annotation_col <- as.data.frame(annotation_col)
+
+# heatmap.quant.col.annot <- HeatmapAnnotation(annotation_col,
+#                                              col = list(Condition = condition.colors), #condition.colors),
+#                                             annotation_name_offset = col_names,
+#                                              show_annotation_name = F,
+#                                             annotation_name_gp = gpar(fontface = "bold", fontsize = 8),
+#                                              annotation_legend_param = list(title_gp = gpar(fontsize = 8, fontface="bold"),
+#                                              labels_gp = gpar(fontsize = 8)))                                                 
+
+```
+
